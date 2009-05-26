@@ -1,0 +1,32 @@
+AC_INIT(memstrike.c)
+AC_CONFIG_AUX_DIR(ac)
+AM_INIT_AUTOMAKE(memstrike, 1.0.0)
+AC_CONFIG_HEADER(config.h)
+
+
+AC_SUBST(CFLAGS)
+if test "" = "$CFLAGS"; then
+	CFLAGS="-O4 -g"
+fi
+CFLAGS="-O4 -g -Wall $CFLAGS"
+
+AC_PROG_CC
+
+
+AC_ARG_WITH([libmemcached],
+	AS_HELP_STRING([--with-libmemcached@<:@=DIR@:>@],
+				   [specify the root directory for libmemcached]),
+	[libmemcached_path="$withval"], [])
+if test "$libmemcached_path" != ""; then
+	CFLAGS="$CFLAGS -I$libmemcached_path/include"
+	LDFLAGS="$LDFLAGS -L$libmemcached_path/lib"
+fi
+
+AC_CHECK_LIB(pthread,pthread_create,,
+	AC_MSG_ERROR([Can't find pthread library]))
+
+AC_CHECK_LIB(memcached,memcached_create,,
+	AC_MSG_ERROR([Can't find libmemcached library]))
+
+AC_OUTPUT([Makefile])
+

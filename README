@@ -1,0 +1,41 @@
+memstrike
+---------
+memcached benchmark tool
+
+
+*Requirements
+
+  Following programs are requred to build
+    - gcc >= 4.1
+    - libmemcached > 0.23
+
+
+*Usage
+
+  Usage: memstrike  [options]  <num requests>
+    -l HOST=127.0.0.1  : memcached server address
+    -p PORT=11211      : memcached server port
+    -k SIZE=8          : size of key >= 8
+    -v SIZE=1024       : size of value
+    -m NUM=1           : get multiplex
+    -t NUM=1           : number of threads
+    -b                 : use binary protocol
+    -g                 : omit to set values
+    -s                 : omit to get benchmark
+    -h                 : print this help message
+
+
+Copyright (C) 2008-2009 FURUHASHI Sadayuki <frsyuki _at_ users.sourceforge.jp>
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
