@@ -17,6 +17,7 @@ const char* g_progname;
 
 static const char* g_host = "127.0.0.1";
 static unsigned short g_port = 11211;
+static char* g_server_list = NULL;
 
 static unsigned long g_num_request;
 static unsigned long g_num_multiplex = 1;
@@ -122,7 +123,20 @@ static memcached_st* initialize_user()
 		exit(1);
 	}
 
-	memcached_server_add(st, g_host, g_port);
+	if(g_server_list) {
+		memcached_server_st* list = memcached_servers_parse(g_server_list);
+		if(list == NULL) {
+			fprintf(stderr, "invalid server list\n");
+			exit(1);
+		}
+		if(memcached_server_push(st, list)) {
+		}
+		memcached_server_list_free(list);
+
+	} else {
+		memcached_server_add(st, g_host, g_port);
+	}
+
 	if(g_binary) {
 		memcached_behavior_set(st, MEMCACHED_BEHAVIOR_BINARY_PROTOCOL, 1);
 	}
@@ -284,6 +298,7 @@ static void usage(const char* msg)
 	printf("Usage: %s [options]    <num requests>\n"
 		" -l HOST=127.0.0.1  : memcached server address\n"
 		" -p PORT=11211      : memcached server port\n"
+		" -d SERVER_LIST     : comma-separated memcached server list\n"
 		" -k SIZE=8          : size of key >= 8\n"
 		" -v SIZE=1024       : size of value\n"
 		" -m NUM=1           : get multiplex\n"
@@ -302,7 +317,7 @@ static void parse_argv(int argc, char* argv[])
 {
 	int c;
 	g_progname = argv[0];
-	while((c = getopt(argc, argv, "hbgsl:p:k:v:m:t:o:")) != -1) {
+	while((c = getopt(argc, argv, "hbgsl:p:k:v:m:t:o:d:")) != -1) {
 		switch(c) {
 		case 'l':
 			g_host = optarg;
@@ -346,6 +361,10 @@ static void parse_argv(int argc, char* argv[])
 		case 'o':
 			g_offset = atoi(optarg);
 			if(g_offset == 0) { usage("invalid key offset"); }
+			break;
+
+		case 'd':
+			g_server_list = optarg;
 			break;
 
 		case 'h': /* FALL THROUGH */
