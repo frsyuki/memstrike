@@ -26,6 +26,7 @@ static unsigned long g_vallen = 1024;
 static bool g_binary = false;
 static bool g_noset = false;
 static bool g_noget = false;
+static uint32_t g_offset = 0;
 
 static pthread_mutex_t g_count_lock;
 static pthread_cond_t  g_count_cond;
@@ -160,6 +161,7 @@ static void pack_keynum(char* keybuf, uint32_t i)
 {
 	/* 0x40 - 0x4f is printable ascii character */
 	unsigned char* prefix = (unsigned char*)keybuf + g_keylen - 8;
+	i += g_offset;
 	prefix[0] = ((i >> 0) & 0x0f) + 0x40;
 	prefix[1] = ((i >> 4) & 0x0f) + 0x40;
 	prefix[2] = ((i >> 8) & 0x0f) + 0x40;
@@ -289,6 +291,7 @@ static void usage(const char* msg)
 		" -b                 : use binary protocol\n"
 		" -g                 : omit to set values\n"
 		" -s                 : omit to get benchmark\n"
+		" -o NUM=0           : key offset\n"
 		" -h                 : print this help message\n"
 		, g_progname);
 	if(msg) { printf("error: %s\n", msg); }
@@ -299,7 +302,7 @@ static void parse_argv(int argc, char* argv[])
 {
 	int c;
 	g_progname = argv[0];
-	while((c = getopt(argc, argv, "hbgsl:p:k:v:m:t:")) != -1) {
+	while((c = getopt(argc, argv, "hbgsl:p:k:v:m:t:o:")) != -1) {
 		switch(c) {
 		case 'l':
 			g_host = optarg;
@@ -338,6 +341,11 @@ static void parse_argv(int argc, char* argv[])
 
 		case 's':
 			g_noget = true;
+			break;
+
+		case 'o':
+			g_offset = atoi(optarg);
+			if(g_offset == 0) { usage("invalid key offset"); }
 			break;
 
 		case 'h': /* FALL THROUGH */
