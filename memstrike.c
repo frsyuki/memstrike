@@ -28,6 +28,7 @@ static bool g_binary = false;
 static bool g_noset = false;
 static bool g_noget = false;
 static uint32_t g_offset = 0;
+static bool g_del = false;
 
 static pthread_mutex_t g_count_lock;
 static pthread_cond_t  g_count_cond;
@@ -293,6 +294,30 @@ static void* worker_get(void* trash)
 }
 
 
+static void* worker_del(void* trash)
+{
+	unsigned long i, t;
+	memcached_return ret;
+	memcached_st* st = initialize_user();
+	char* keybuf = malloc_keybuf();
+
+	printf("d");
+	t = wait_worker_ready();
+
+	for(i=t*g_num_request, t=i+g_num_request; i < t; ++i) {
+		pack_keynum(keybuf, i);
+		ret = memcached_delete(st, keybuf, g_keylen, 0);
+		if(ret != MEMCACHED_SUCCESS) {
+			fprintf(stderr, "del failed: %s\n", memcached_strerror(st, ret));
+		}
+	}
+
+	free(keybuf);
+	memcached_free(st);
+	return NULL;
+}
+
+
 static void usage(const char* msg)
 {
 	printf("Usage: %s [options]    <num requests>\n"
@@ -306,6 +331,7 @@ static void usage(const char* msg)
 		" -b                 : use binary protocol\n"
 		" -g                 : omit to set values\n"
 		" -s                 : omit to get benchmark\n"
+		" -x                 : delete keys\n"
 		" -o NUM=0           : key offset\n"
 		" -h                 : print this help message\n"
 		, g_progname);
@@ -317,7 +343,7 @@ static void parse_argv(int argc, char* argv[])
 {
 	int c;
 	g_progname = argv[0];
-	while((c = getopt(argc, argv, "hbgsl:p:k:v:m:t:o:d:")) != -1) {
+	while((c = getopt(argc, argv, "hbgsxl:p:k:v:m:t:o:d:")) != -1) {
 		switch(c) {
 		case 'l':
 			g_host = optarg;
@@ -365,6 +391,10 @@ static void parse_argv(int argc, char* argv[])
 
 		case 'd':
 			g_server_list = optarg;
+			break;
+
+		case 'x':
+			g_del = true;
 			break;
 
 		case 'h': /* FALL THROUGH */
@@ -416,6 +446,16 @@ int main(int argc, char* argv[])
 	if(!g_noget) {
 		printf("----\n[");
 		threads = create_worker(worker_get);
+		reset_timer();
+		printf("] ...\n");
+		start_worker();
+		join_worker(threads);
+		show_timer();
+	}
+
+	if(g_del) {
+		printf("----\n[");
+		threads = create_worker(worker_del);
 		reset_timer();
 		printf("] ...\n");
 		start_worker();
