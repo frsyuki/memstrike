@@ -19,15 +19,16 @@ static const char* g_host = "127.0.0.1";
 static unsigned short g_port = 11211;
 static char* g_server_list = NULL;
 
-static unsigned long g_num_request;
+static unsigned long long g_num_request;
+static bool g_keymode_64 = false;
 static unsigned long g_num_multiplex = 1;
 static unsigned long g_num_thread = 1;
-static unsigned long g_keylen = 8;
+static unsigned long g_keylen = 16;
 static unsigned long g_vallen = 1024;
 static bool g_binary = false;
 static bool g_noset = false;
 static bool g_noget = false;
-static uint32_t g_offset = 0;
+static unsigned long long g_offset = 0;
 static bool g_del = false;
 
 static pthread_mutex_t g_count_lock;
@@ -48,16 +49,16 @@ void show_timer()
 {
 	struct timeval endtime;
 	double sec;
-	unsigned long size_bytes = (g_keylen+g_vallen) * g_num_request * g_num_thread;
-	unsigned long requests = g_num_request * g_num_thread;
+	double requests = g_num_request * g_num_thread;
+	double size_bytes = (g_keylen+g_vallen) * requests;
 	gettimeofday(&endtime, NULL);
 	sec = (endtime.tv_sec - g_timer.tv_sec)
 		+ (double)(endtime.tv_usec - g_timer.tv_usec) / 1000 / 1000;
-	printf("%f sec\n", sec);
-	printf("%f MB\n", ((double)size_bytes)/1024/1024);
-	printf("%f Mbps\n", ((double)size_bytes)*8/sec/1000/1000);
-	printf("%f req/sec\n", ((double)requests)/sec);
-	printf("%f usec/req\n", ((double)sec)/requests*1000*1000);
+	printf("%lf sec\n",      sec);
+	printf("%lf MB\n",       size_bytes/1024/1024);
+	printf("%lf Mbps\n",     size_bytes*8/sec/1000/1000);
+	printf("%lf req/sec\n",  requests/sec);
+	printf("%lf usec/req\n", sec/requests*1000*1000);
 }
 
 
@@ -130,12 +131,15 @@ static memcached_st* initialize_user()
 			fprintf(stderr, "invalid server list\n");
 			exit(1);
 		}
-		if(memcached_server_push(st, list)) {
+		if(memcached_server_push(st, list) != MEMCACHED_SUCCESS) {
+			// FIXME
 		}
 		memcached_server_list_free(list);
 
 	} else {
-		memcached_server_add(st, g_host, g_port);
+		char* hostbuf = strdup(g_host);
+		memcached_server_add(st, hostbuf, g_port);
+		free(hostbuf);
 	}
 
 	if(g_binary) {
@@ -172,24 +176,44 @@ static char* malloc_valbuf()
 	return valbuf;
 }
 
-static void pack_keynum(char* keybuf, uint32_t i)
+static void pack_keynum(char* keybuf, unsigned long long i)
 {
-	/* 0x40 - 0x4f is printable ascii character */
-	unsigned char* prefix = (unsigned char*)keybuf + g_keylen - 8;
 	i += g_offset;
-	prefix[0] = ((i >> 0) & 0x0f) + 0x40;
-	prefix[1] = ((i >> 4) & 0x0f) + 0x40;
-	prefix[2] = ((i >> 8) & 0x0f) + 0x40;
-	prefix[3] = ((i >>12) & 0x0f) + 0x40;
-	prefix[4] = ((i >>16) & 0x0f) + 0x40;
-	prefix[5] = ((i >>20) & 0x0f) + 0x40;
-	prefix[6] = ((i >>24) & 0x0f) + 0x40;
-	prefix[7] = ((i >>28) & 0x0f) + 0x40;
+	/* 0x40 - 0x4f is printable ascii character */
+	if(g_keymode_64) {
+		unsigned char* prefix = (unsigned char*)keybuf + g_keylen - 16;
+		prefix[ 0] = ((i >> 0) & 0x0f) + 0x40;
+		prefix[ 1] = ((i >> 4) & 0x0f) + 0x40;
+		prefix[ 2] = ((i >> 8) & 0x0f) + 0x40;
+		prefix[ 3] = ((i >>12) & 0x0f) + 0x40;
+		prefix[ 4] = ((i >>16) & 0x0f) + 0x40;
+		prefix[ 5] = ((i >>20) & 0x0f) + 0x40;
+		prefix[ 6] = ((i >>24) & 0x0f) + 0x40;
+		prefix[ 7] = ((i >>28) & 0x0f) + 0x40;
+		prefix[ 8] = ((i >>32) & 0x0f) + 0x40;
+		prefix[ 9] = ((i >>36) & 0x0f) + 0x40;
+		prefix[10] = ((i >>40) & 0x0f) + 0x40;
+		prefix[11] = ((i >>44) & 0x0f) + 0x40;
+		prefix[12] = ((i >>48) & 0x0f) + 0x40;
+		prefix[13] = ((i >>52) & 0x0f) + 0x40;
+		prefix[14] = ((i >>56) & 0x0f) + 0x40;
+		prefix[15] = ((i >>60) & 0x0f) + 0x40;
+	} else {
+		unsigned char* prefix = (unsigned char*)keybuf + g_keylen - 8;
+		prefix[0] = ((i >> 0) & 0x0f) + 0x40;
+		prefix[1] = ((i >> 4) & 0x0f) + 0x40;
+		prefix[2] = ((i >> 8) & 0x0f) + 0x40;
+		prefix[3] = ((i >>12) & 0x0f) + 0x40;
+		prefix[4] = ((i >>16) & 0x0f) + 0x40;
+		prefix[5] = ((i >>20) & 0x0f) + 0x40;
+		prefix[6] = ((i >>24) & 0x0f) + 0x40;
+		prefix[7] = ((i >>28) & 0x0f) + 0x40;
+	}
 }
 
 static void* worker_set(void* trash)
 {
-	unsigned long i, t;
+	unsigned long long i, t;
 	memcached_return ret;
 	memcached_st* st = initialize_user();
 	char* keybuf = malloc_keybuf();
@@ -214,7 +238,8 @@ static void* worker_set(void* trash)
 
 static void* worker_get(void* trash)
 {
-	unsigned long i, t, m;
+	unsigned long long i, t;
+	unsigned long m;
 	memcached_st* st = initialize_user();
 	char* mkeybuf[g_num_multiplex];
 	size_t mkeylen[g_num_multiplex];
@@ -296,7 +321,7 @@ static void* worker_get(void* trash)
 
 static void* worker_del(void* trash)
 {
-	unsigned long i, t;
+	unsigned long long i, t;
 	memcached_return ret;
 	memcached_st* st = initialize_user();
 	char* keybuf = malloc_keybuf();
@@ -324,7 +349,7 @@ static void usage(const char* msg)
 		" -l HOST=127.0.0.1  : memcached server address\n"
 		" -p PORT=11211      : memcached server port\n"
 		" -d SERVER_LIST     : comma-separated memcached server list\n"
-		" -k SIZE=8          : size of key >= 8\n"
+		" -k SIZE=16         : size of key >= 8\n"
 		" -v SIZE=1024       : size of value\n"
 		" -m NUM=1           : get multiplex\n"
 		" -t NUM=1           : number of threads\n"
@@ -355,12 +380,12 @@ static void parse_argv(int argc, char* argv[])
 			break;
 
 		case 'k':
-			g_keylen = atoi(optarg);
+			g_keylen = strtol(optarg, NULL, 10);
 			if(g_keylen < 8) { usage("invalid key size"); }
 			break;
 
 		case 'v':
-			g_vallen  = atoi(optarg);
+			g_vallen  = strtol(optarg, NULL, 10);
 			if(g_vallen == 0) { usage("invalid value size"); }
 			break;
 
@@ -369,11 +394,11 @@ static void parse_argv(int argc, char* argv[])
 			break;
 
 		case 'm':
-			g_num_multiplex  = atoi(optarg);
+			g_num_multiplex  = strtol(optarg, NULL, 10);
 			break;
 
 		case 't':
-			g_num_thread  = atoi(optarg);
+			g_num_thread  = strtol(optarg, NULL, 10);
 			break;
 
 		case 'g':
@@ -385,7 +410,7 @@ static void parse_argv(int argc, char* argv[])
 			break;
 
 		case 'o':
-			g_offset = atoi(optarg);
+			g_offset = strtoll(optarg, NULL, 10);
 			if(g_offset == 0) { usage("invalid key offset"); }
 			break;
 
@@ -408,15 +433,24 @@ static void parse_argv(int argc, char* argv[])
 
 	if(argc != 1) { usage(NULL); }
 
-	unsigned long multiplex_request = atoi(argv[optind]) / g_num_thread / g_num_multiplex;
+	char* numstr = argv[optind];
+	long long int multiplex_request = strtoll(numstr, NULL, 10) / g_num_thread / g_num_multiplex;
+
 	g_num_request = multiplex_request * g_num_multiplex;
 
 	if(g_num_request == 0) { usage("invalid number of request"); }
 
-	printf("number of threads    : %lu\n", g_num_thread);
-	printf("number of requests   : %lu\n", g_num_thread * g_num_request);
-	printf("requests per thread  : %lu\n", g_num_request);
-	printf("get multiplex        : %lu\n", g_num_multiplex);
+	if(g_num_request > 0xffffffffLLU) {
+		if(g_keylen < 16) {
+			usage("size of key must be >= 16 if number of requests is >= 4294967295");
+		}
+		g_keymode_64 = true;
+	}
+
+	printf("number of threads    : %lu\n",  g_num_thread);
+	printf("number of requests   : %llu\n", g_num_request * g_num_thread);
+	printf("requests per thread  : %llu\n", g_num_request);
+	printf("get multiplex        : %lu\n",  g_num_multiplex);
 	printf("size of key          : %lu bytes\n", g_keylen);
 	printf("size of value        : %lu bytes\n", g_vallen);
 }
