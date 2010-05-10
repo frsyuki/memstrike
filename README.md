@@ -7,8 +7,8 @@ memcached benchmark tool
 
 Following programs are requred to build:
 
-  - gcc >= 4.1
-  - libmemcached > 0.23
+ - gcc >= 4.1
+ - libmemcached > 0.23
 
 
 ## Usage
@@ -23,6 +23,7 @@ Following programs are requred to build:
       -b                 : use binary protocol
       -g                 : omit to set values
       -s                 : omit to get benchmark
+      -o NUM=0           : key offset
       -h                 : print this help message
 
 
