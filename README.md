@@ -3,7 +3,7 @@ memstrike
 memcached benchmark tool
 
 
-*Requirements
+## Requirements
 
 Following programs are requred to build:
 
@@ -11,7 +11,7 @@ Following programs are requred to build:
   - libmemcached > 0.23
 
 
-*Usage
+## Usage
 
     Usage: memstrike  [options]  <num requests>
       -l HOST=127.0.0.1  : memcached server address
@@ -26,7 +26,7 @@ Following programs are requred to build:
       -h                 : print this help message
 
 
-*License
+## License
 
     Copyright (c) 2008-2010 FURUHASHI Sadayuki
     
